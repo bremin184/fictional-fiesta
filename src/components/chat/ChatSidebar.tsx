@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { MessageSquare, Send, X } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { NeonButton } from '@/components/ui/NeonButton';
@@ -13,24 +13,27 @@ export interface ChatMessage {
 
 interface ChatSidebarProps {
     messages: ChatMessage[];
-    newMessage: string;
-    onNewMessageChange: (value: string) => void;
-    onSendMessage: () => void;
+    onSendMessage: (text: string) => void;
     onClose: () => void;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     messages,
-    newMessage,
-    onNewMessageChange,
     onSendMessage,
     onClose,
 }) => {
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const [newMessage, setNewMessage] = useState('');
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    const handleSend = () => {
+        if (!newMessage.trim()) return;
+        onSendMessage(newMessage);
+        setNewMessage('');
+    };
 
     return (
         <GlassPanel className="w-full lg:w-full lg:h-[calc(100vh-7rem)] flex flex-col border-l border-border/30 lg:border-l-border/50 animate-slide-in-right transition-opacity duration-300 ease-out">
@@ -67,12 +70,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     <input
                         type="text"
                         value={newMessage}
-                        onChange={(e) => onNewMessageChange(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && onSendMessage()}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                         placeholder="Type a message..."
                         className="flex-1 px-4 py-3 rounded-xl bg-muted border border-border focus:border-primary focus:outline-none transition-colors"
                     />
-                    <NeonButton onClick={onSendMessage} className="px-4">
+                    <NeonButton onClick={handleSend} className="px-4">
                         <Send className="w-5 h-5" />
                     </NeonButton>
                 </div>

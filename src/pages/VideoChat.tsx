@@ -27,7 +27,6 @@ const VideoChat: React.FC = () => {
   const [showChat, setShowChat] = useState(false);
   const [showGames, setShowGames] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [devicesSelected, setDevicesSelected] = useState(false);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
@@ -147,8 +146,8 @@ const VideoChat: React.FC = () => {
     ]);
   };
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+  const handleSendMessage = (text: string) => {
+    if (!text.trim()) return;
 
     // Add to local messages
     setMessages((prev) => [
@@ -156,7 +155,7 @@ const VideoChat: React.FC = () => {
       {
         id: Date.now().toString(),
         senderId: 'me',
-        text: newMessage,
+        text,
         timestamp: new Date(),
         type: 'text',
       },
@@ -166,11 +165,9 @@ const VideoChat: React.FC = () => {
     if (match) {
       const socket = getSocket();
       if (socket) {
-        socket.emit('chatMessage', { roomId: match.roomId, text: newMessage });
+        socket.emit('chatMessage', { roomId: match.roomId, text });
       }
     }
-
-    setNewMessage('');
   };
 
   const handleSkip = () => {
@@ -371,8 +368,6 @@ const VideoChat: React.FC = () => {
       {showChat && (
         <ChatSidebar
           messages={messages}
-          newMessage={newMessage}
-          onNewMessageChange={setNewMessage}
           onSendMessage={handleSendMessage}
           onClose={() => setShowChat(false)}
         />
