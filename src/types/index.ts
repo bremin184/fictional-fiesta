@@ -2,10 +2,11 @@ export interface User {
   id: string;
   name: string;
   avatar: string;
-  gender: 'male' | 'female' | 'other';
+  gender?: 'male' | 'female' | 'other';
   status: 'online' | 'busy' | 'away';
   age?: number;
   country?: string;
+  interests?: string[];
 }
 
 export interface ChatMessage {

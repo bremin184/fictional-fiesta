@@ -1,22 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  Video,
-  VideoOff,
-  Mic,
-  MicOff,
-  PhoneOff,
-  MessageSquare,
-  Gamepad2,
-  SkipForward,
-  ChevronLeft,
-  Send,
-  X,
-  Zap,
-} from 'lucide-react';
+import { ChevronLeft, Zap } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { NeonButton } from '@/components/ui/NeonButton';
-import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useApp } from '@/context/AppContext';
 import { games } from '@/data/games';
 import { DeviceCheck } from '@/components/ui/DeviceCheck';
@@ -24,14 +9,12 @@ import { SearchingOverlay } from '@/components/ui/SearchingOverlay';
 import { VideoCall } from '@/components/ui/VideoCall';
 import { useMatchFinding } from '@/hooks/useMatchFinding';
 import { getSocket } from '@/lib/socket';
-
-interface ChatMessage {
-  id: string;
-  senderId: string;
-  text: string;
-  timestamp: Date;
-  type: 'text' | 'system';
-}
+import { ChatSidebar, ChatMessage } from '@/components/chat/ChatSidebar';
+import { GamesSidebar } from '@/components/chat/GamesSidebar';
+import { VideoChatControls } from '@/components/chat/VideoChatControls';
+import { GameOverlay } from '@/components/games/GameOverlay';
+import { GameInvitePopup } from '@/components/games/GameInvitePopup';
+import { getGameById } from '@/data/games';
 
 const VideoChat: React.FC = () => {
   const navigate = useNavigate();
@@ -47,35 +30,85 @@ const VideoChat: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [devicesSelected, setDevicesSelected] = useState(false);
+  const [activeGameId, setActiveGameId] = useState<string | null>(null);
+  const [pendingInvite, setPendingInvite] = useState<{ gameId: string; gameName: string } | null>(null);
+  const [waitingForResponse, setWaitingForResponse] = useState<string | null>(null);
+  const [isGameInviter, setIsGameInviter] = useState(false);
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  
   // Refs for cleanup in useEffect
   const matchRef = useRef(match);
   const isSearchingRef = useRef(isSearching);
   const localStreamRef = useRef(localStream);
 
-  // Update refs when state changes
   useEffect(() => {
     matchRef.current = match;
     isSearchingRef.current = isSearching;
     localStreamRef.current = localStream;
   }, [match, isSearching, localStream]);
 
+  // Listen for real chat messages from Socket.io
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleIncomingMessage = ({ senderId, text }: { senderId: string; text: string }) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          senderId,
+          text,
+          timestamp: new Date(),
+          type: 'text',
+        },
+      ]);
+    };
+
+    socket.on('chatMessage', handleIncomingMessage);
+    return () => {
+      socket.off('chatMessage', handleIncomingMessage);
+    };
+  }, []);
+
+  // Listen for game invite events
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleGameInvite = ({ gameId, gameName }: { gameId: string; gameName: string }) => {
+      setPendingInvite({ gameId, gameName });
+    };
+
+    const handleInviteResponse = ({ gameId, accepted }: { gameId: string; accepted: boolean }) => {
+      setWaitingForResponse(null);
+      if (accepted) {
+        setIsGameInviter(true); // I sent the invite, I call game:start
+        setActiveGameId(gameId);
+        addSystemMessage('Game invite accepted! Starting game...');
+      } else {
+        addSystemMessage('Game invite was declined.');
+      }
+    };
+
+    socket.on('game:invite', handleGameInvite);
+    socket.on('game:invite-response', handleInviteResponse);
+
+    return () => {
+      socket.off('game:invite', handleGameInvite);
+      socket.off('game:invite-response', handleInviteResponse);
+    };
+  }, []);
+
   const handlePeerDisconnect = useCallback(() => {
     addSystemMessage('Partner disconnected.');
     setConnectedUser(null);
-    // Optional: Auto-skip after a delay
-    // setTimeout(handleSkip, 2000);
   }, []);
 
   const handleDevicesReady = async (cameraId: string, micId: string) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: cameraId },
-        audio: { deviceId: micId }
+        audio: { deviceId: micId },
       });
       setLocalStream(stream);
       setDevicesSelected(true);
@@ -93,7 +126,7 @@ const VideoChat: React.FC = () => {
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match.peerInfo.socketId}`,
         status: 'online',
         country: 'Unknown',
-        interests: []
+        interests: [],
       });
       addSystemMessage('Connected with a new match!');
     } else {
@@ -117,6 +150,7 @@ const VideoChat: React.FC = () => {
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
 
+    // Add to local messages
     setMessages((prev) => [
       ...prev,
       {
@@ -127,35 +161,28 @@ const VideoChat: React.FC = () => {
         type: 'text',
       },
     ]);
-    setNewMessage('');
 
-    // Simulate response
-    setTimeout(() => {
-      const responses = [
-        'Hey there! 👋',
-        'Nice to meet you!',
-        'How are you doing?',
-        'That\'s interesting!',
-        'Cool, tell me more!',
-      ];
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          senderId: connectedUser?.id || 'other',
-          text: responses[Math.floor(Math.random() * responses.length)],
-          timestamp: new Date(),
-          type: 'text',
-        },
-      ]);
-    }, 1500);
+    // Send via Socket.io to peer
+    if (match) {
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('chatMessage', { roomId: match.roomId, text: newMessage });
+      }
+    }
+
+    setNewMessage('');
   };
 
   const handleSkip = () => {
+    // Clean up current call before finding new match
+    if (match) {
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('endCall', { roomId: match.roomId });
+      }
+    }
     setConnectedUser(null);
     setMessages([]);
-    // If we are matched, we need to disconnect first (VideoCall unmount handles WebRTC cleanup)
-    // Then find a new match
     findMatch();
     addSystemMessage('Searching for new match...');
   };
@@ -167,7 +194,7 @@ const VideoChat: React.FC = () => {
     if (isSearching) {
       cancelSearch();
     }
-    
+
     const socket = getSocket();
     if (socket && match) {
       socket.emit('endCall', { roomId: match.roomId });
@@ -176,11 +203,11 @@ const VideoChat: React.FC = () => {
     navigate('/lobby');
   }, [localStream, isSearching, cancelSearch, match, navigate]);
 
-  // Cleanup on unmount (e.g. browser back button)
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
       }
       const socket = getSocket();
       if (socket) {
@@ -208,16 +235,13 @@ const VideoChat: React.FC = () => {
     setIsVideoOff(!isVideoOff);
   };
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
   return (
-    <div className={`h-screen bg-background flex flex-col lg:grid lg:gap-4 lg:p-4 overflow-hidden transition-all duration-300 ease-out ${
-      showGames 
-        ? 'lg:grid-cols-[30%_1fr_20rem]' 
+    <div
+      className={`h-screen bg-background flex flex-col lg:grid lg:gap-4 lg:p-4 overflow-hidden transition-all duration-300 ease-out ${showGames
+        ? 'lg:grid-cols-[30%_1fr_20rem]'
         : 'lg:grid-cols-[1fr_20rem]'
-    }`}>
+        }`}
+    >
       {/* Main Video Area */}
       <div className="flex flex-col overflow-hidden">
         {/* Top Bar */}
@@ -247,165 +271,140 @@ const VideoChat: React.FC = () => {
         {/* Remote Video / Searching State */}
         <div className="flex-1 relative bg-gradient-to-br from-muted to-card flex items-center justify-center">
           {!devicesSelected && (
-            <DeviceCheck 
-              onDevicesReady={handleDevicesReady} 
+            <DeviceCheck
+              onDevicesReady={handleDevicesReady}
               isLoading={isSearching}
               className="z-10"
             />
           )}
 
-          {isSearching && (
-            <SearchingOverlay onCancel={cancelSearch} />
-          )}
+          {isSearching && <SearchingOverlay onCancel={cancelSearch} />}
 
           {match && (
-            <VideoCall 
-              match={match} 
-              localStream={localStream} 
+            <VideoCall
+              match={match}
+              localStream={localStream}
               onEndCall={handleEndCall}
               onPeerDisconnect={handlePeerDisconnect}
             />
           )}
-        </div>
 
-        {/* Local Video Preview - Handled by VideoCall component now */}
+          {/* Game Overlay - renders on top of video, keeps connection alive */}
+          {activeGameId && (
+            <GameOverlay
+              gameId={activeGameId}
+              isAI={!match}
+              roomId={match?.roomId || null}
+              isInitiator={isGameInviter}
+              onClose={() => { setActiveGameId(null); setIsGameInviter(false); }}
+            />
+          )}
+
+          {/* Game Invite Popup - shown to the receiver */}
+          {pendingInvite && (
+            <GameInvitePopup
+              gameId={pendingInvite.gameId}
+              gameName={pendingInvite.gameName}
+              onAccept={() => {
+                const socket = getSocket();
+                if (socket && match) {
+                  socket.emit('game:invite-response', {
+                    roomId: match.roomId,
+                    gameId: pendingInvite.gameId,
+                    accepted: true,
+                  });
+                }
+                setIsGameInviter(false); // I'm the receiver, don't call game:start
+                setActiveGameId(pendingInvite.gameId);
+                setPendingInvite(null);
+              }}
+              onDecline={() => {
+                const socket = getSocket();
+                if (socket && match) {
+                  socket.emit('game:invite-response', {
+                    roomId: match.roomId,
+                    gameId: pendingInvite.gameId,
+                    accepted: false,
+                  });
+                }
+                setPendingInvite(null);
+              }}
+            />
+          )}
+
+          {/* Waiting for invite response toast */}
+          {waitingForResponse && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60]">
+              <GlassPanel className="px-6 py-3 flex items-center gap-3">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-medium">Waiting for response...</span>
+                <button
+                  onClick={() => setWaitingForResponse(null)}
+                  className="text-xs text-muted-foreground hover:text-foreground ml-2"
+                >
+                  Cancel
+                </button>
+              </GlassPanel>
+            </div>
+          )}
+        </div>
 
         {/* Control Bar */}
         {match && (
-        <div className="sticky bottom-0 left-0 right-0 z-40 flex justify-center py-4 lg:py-6 bg-background/50 backdrop-blur-sm border-t border-border/50">
-          <GlassPanel className="px-6 py-4 flex items-center gap-4">
-            <button
-              onClick={toggleMute}
-              className={`control-btn ${isMuted ? 'active' : ''}`}
-            >
-              {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-            </button>
-
-            <button
-              onClick={toggleVideo}
-              className={`control-btn ${isVideoOff ? 'active' : ''}`}
-            >
-              {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-            </button>
-
-            <button
-              onClick={() => setShowChat(!showChat)}
-              className={`control-btn ${showChat ? 'active' : ''}`}
-            >
-              <MessageSquare className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => setShowGames(!showGames)}
-              className={`control-btn ${showGames ? 'active' : ''}`}
-            >
-              <Gamepad2 className="w-6 h-6" />
-            </button>
-
-            {connectedUser && (
-              <button onClick={handleSkip} className="control-btn">
-                <SkipForward className="w-6 h-6" />
-              </button>
-            )}
-
-            <button onClick={handleEndCall} className="control-btn danger">
-              <PhoneOff className="w-6 h-6" />
-            </button>
-          </GlassPanel>
-        </div>
+          <VideoChatControls
+            isMuted={isMuted}
+            isVideoOff={isVideoOff}
+            showChat={showChat}
+            showGames={showGames}
+            hasConnectedUser={!!connectedUser}
+            onToggleMute={toggleMute}
+            onToggleVideo={toggleVideo}
+            onToggleChat={() => setShowChat(!showChat)}
+            onToggleGames={() => setShowGames(!showGames)}
+            onSkip={handleSkip}
+            onEndCall={handleEndCall}
+          />
         )}
       </div>
 
       {/* Chat Sidebar */}
       {showChat && (
-        <GlassPanel className="w-full lg:w-full lg:h-[calc(100vh-7rem)] flex flex-col border-l border-border/30 lg:border-l-border/50 animate-slide-in-right transition-opacity duration-300 ease-out">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="font-display font-semibold flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-primary" />
-              Chat
-            </h3>
-            <button
-              onClick={() => setShowChat(false)}
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`${
-                  msg.type === 'system'
-                    ? 'text-center text-xs text-muted-foreground'
-                    : `chat-bubble ${msg.senderId === 'me' ? 'sent' : 'received'}`
-                }`}
-              >
-                {msg.text}
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-
-          <div className="p-4 border-t border-border">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Type a message..."
-                className="flex-1 px-4 py-3 rounded-xl bg-muted border border-border focus:border-primary focus:outline-none transition-colors"
-              />
-              <NeonButton onClick={handleSendMessage} className="px-4">
-                <Send className="w-5 h-5" />
-              </NeonButton>
-            </div>
-          </div>
-        </GlassPanel>
+        <ChatSidebar
+          messages={messages}
+          newMessage={newMessage}
+          onNewMessageChange={setNewMessage}
+          onSendMessage={handleSendMessage}
+          onClose={() => setShowChat(false)}
+        />
       )}
 
-      {/* Games Area */}
+      {/* Games Sidebar */}
       {showGames && (
-        <div className="w-full lg:w-auto flex flex-col overflow-hidden bg-gradient-to-br from-muted/20 to-card/50 border-l border-border/30 animate-slide-in-right transition-opacity duration-300 ease-out">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h2 className="text-lg font-display font-bold flex items-center gap-2">
-              <Gamepad2 className="w-5 h-5 text-secondary" />
-              Games
-            </h2>
-            <button
-              onClick={() => setShowGames(false)}
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            <div className="grid grid-cols-1 gap-3">
-              {(connectedUser
-                ? games
-                : games.filter((g) => g.supportsAI)
-              ).map((game) => (
-                <button
-                  key={game.id}
-                  onClick={() => {
-                    navigate(`/games/${game.id}?ai=${connectedUser ? 'false' : 'true'}`);
-                  }}
-                  className="p-3 rounded-lg bg-muted/50 hover:bg-muted border border-border hover:border-primary/50 transition-all text-left group"
-                >
-                  <div className="text-2xl mb-1">{game.icon}</div>
-                  <h3 className="font-semibold text-sm group-hover:text-primary transition-colors">
-                    {game.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {game.description}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <GamesSidebar
+          games={games}
+          connectedUser={!!connectedUser}
+          onSelectGame={(gameId) => {
+            setShowGames(false);
+            if (connectedUser && match) {
+              // Multiplayer: send invite to peer
+              const game = getGameById(gameId);
+              const socket = getSocket();
+              if (socket && game) {
+                socket.emit('game:invite', {
+                  roomId: match.roomId,
+                  gameId,
+                  gameName: game.name,
+                });
+                setWaitingForResponse(gameId);
+                addSystemMessage(`Sent game invite: ${game.name}. Waiting for response...`);
+              }
+            } else {
+              // AI mode: open directly
+              setActiveGameId(gameId);
+            }
+          }}
+          onClose={() => setShowGames(false)}
+        />
       )}
     </div>
   );

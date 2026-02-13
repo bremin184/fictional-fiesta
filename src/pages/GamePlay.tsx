@@ -22,6 +22,7 @@ const GamePlay: React.FC = () => {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
   const isAI = searchParams.get('ai') === 'true';
+  const roomId = searchParams.get('roomId') || null;
   const { connectedUser } = useApp();
 
   const [score, setScore] = useState({ player: 0, opponent: 0 });
@@ -58,7 +59,7 @@ const GamePlay: React.FC = () => {
   }
 
   const renderGame = () => {
-    const props = { key: gameKey, isAI, onGameEnd: handleGameEnd };
+    const props = { key: gameKey, isAI, onGameEnd: handleGameEnd, roomId: isAI ? null : roomId };
 
     switch (gameId) {
       case 'tic-tac-toe':

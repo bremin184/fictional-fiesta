@@ -1,137 +1,120 @@
-ChatVisha
-Project Overview
+# Visha — Video Chat Platform
 
-ChatVisha is a web-based real-time video chat and multiplayer game platform built with React, TypeScript, Tailwind CSS, and shadcn/ui.
-It allows users to participate in video calls while playing interactive multiplayer games. The platform emphasizes modularity, responsive design, and smooth user experience for both video communication and gaming.
+> Connect with people, play games, and have real conversations.
 
-Features
+## Overview
 
-Real-time video chat with multiple participants
+Visha is a real-time video chat platform built with WebRTC peer-to-peer connections. It features random matchmaking, in-call text chat, and 14 interactive games you can play with your match or against AI.
 
-Integrated multiplayer games, including:
+## Tech Stack
 
-Connect Four
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 · TypeScript · Vite |
+| **Styling** | Tailwind CSS · shadcn/ui |
+| **Real-time** | Socket.io · WebRTC |
+| **Server** | Express · Node.js |
 
-Hangman
+## Project Structure
 
-Memory Match
+```
+vishachat/
+├── src/                  # React frontend (client)
+│   ├── components/       # UI components (shadcn/ui + custom)
+│   ├── pages/            # Route pages (Landing, Lobby, VideoChat, Games)
+│   ├── hooks/            # Custom hooks (WebRTC, matchmaking, media)
+│   ├── context/          # React Context (app state)
+│   ├── lib/              # Socket client & utilities
+│   ├── data/             # Static data (games list, mock users)
+│   └── types/            # TypeScript type definitions
+│
+├── server/               # Express + Socket.io signaling server
+│   └── src/
+│       ├── index.js      # Server entry point
+│       ├── socketHandler.js  # Connection & signaling logic
+│       ├── presence.js   # User presence tracking
+│       └── store.js      # In-memory state
+│
+├── vite.config.ts        # Vite configuration
+├── tailwind.config.ts    # Tailwind CSS configuration
+└── package.json          # Frontend dependencies
+```
 
-Rock Paper Scissors
+## Getting Started
 
-Tic Tac Toe
+### Prerequisites
 
-Trivia Game
+- **Node.js** >= 18
+- **npm** >= 9
 
-Word Chain
+### 1. Clone the repository
 
-Would You Rather
+```bash
+git clone https://github.com/bremin184/vishachat.git
+cd vishachat
+```
 
-Responsive UI built with Tailwind CSS
+### 2. Set up environment variables
 
-Component-driven design using shadcn/ui for modularity
+```bash
+cp .env.example .env
+```
 
-Context-based state management for global app state
+Edit `.env` and configure:
 
-Accessible and maintainable codebase with TypeScript type safety
+```env
+VITE_SOCKET_URL=http://localhost:3001
+```
 
-Project Structure
-src/
-├─ components/      # UI components, games, modals, video components
-├─ context/         # App context and custom hooks
-├─ pages/           # Page-level components (VideoChat, GamePlay, Lobby, etc.)
-├─ data/            # Mock data and game definitions
-├─ hooks/           # Custom hooks (e.g., use-toast, use-mobile)
-├─ lib/             # Utility functions
-├─ types/           # Type definitions
-├─ main.tsx         # Application entry point
-├─ App.tsx          # Root component
+### 3. Install dependencies
 
-
-Other key files:
-
-tailwind.config.ts — Tailwind configuration
-
-vite.config.ts — Vite configuration
-
-package.json — Project dependencies and scripts
-
-README.md — Project documentation
-
-Installation
-
-Clone the repository:
-
-git clone(https://github.com/bremin184/vishachat.git).git
-cd chatvisha
-
-
-Install dependencies:
-
+```bash
+# Frontend
 npm install
 
+# Server
+cd server && npm install && cd ..
+```
 
-Start the development server:
+### 4. Start development
 
+```bash
+# Terminal 1: Start the signaling server
+cd server && npm run dev
+
+# Terminal 2: Start the frontend
 npm run dev
+```
 
+The frontend will be available at `http://localhost:8080`.
 
-Open your browser and navigate to:
+## Available Scripts
 
-http://localhost:8080
+### Frontend
 
-Available Scripts
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Production build |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run tests |
 
-npm run dev — Start development server with hot-reloading
+### Server
 
-npm run build — Build production-ready assets
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start production server |
+| `npm run dev` | Start with nodemon (auto-reload) |
 
-npm run preview — Preview production build locally
+## Features
 
-npm run test — Run automated tests (Vitest)
+- **HD Video Chat** — WebRTC peer-to-peer video calls
+- **Smart Matching** — Dynamic random or gender-preference matching
+- **Text Chat** — Real-time messaging during video calls
+- **14 Games** — Tic Tac Toe, Chess, Connect Four, Trivia, and more
+- **AI Opponents** — Play games solo against AI
 
-npm run lint — Run ESLint for code quality
+## License
 
-Contributing
-
-Fork the repository and create a feature branch:
-
-git checkout -b feature/your-feature-name
-
-
-Make your changes and test thoroughly
-
-Commit your changes with clear messages
-
-Push your branch and create a pull request
-
-All contributions should maintain code readability, modularity, and TypeScript type safety.
-
-Technologies Used
-
-React — Frontend library for UI development
-
-TypeScript — Strongly-typed JavaScript for maintainability
-
-Tailwind CSS — Utility-first CSS framework
-
-Vite — Fast frontend build tool
-
-shadcn/ui — Component library for consistent UI
-
-React Router DOM — Client-side routing
-
-React Query (TanStack) — Data fetching and caching
-
-Vitest — Unit testing framework
-
-Notes
-
-The project uses a modular component structure to simplify maintenance and future feature expansion.
-
-All UI elements use Tailwind utility classes and adhere to responsive design principles.
-
-Video chat functionality is integrated alongside games in a flexible layout, ensuring both players maintain visibility during gameplay.
-
-License
-
-This project is licensed under the MIT License.
+MIT

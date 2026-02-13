@@ -9,10 +9,13 @@ let socket: Socket | null = null;
 const getOrCreateSessionId = (): string => {
   if (typeof window === 'undefined') return '';
 
-  let sessionId = localStorage.getItem('vchat_session_id');
+  // Use sessionStorage so each tab gets its own identity.
+  // This allows two tabs in the same browser to match with each other
+  // (the server rejects same-sessionId matching to prevent self-matching).
+  let sessionId = sessionStorage.getItem('vchat_session_id');
   if (!sessionId) {
     sessionId = uuidv4();
-    localStorage.setItem('vchat_session_id', sessionId);
+    sessionStorage.setItem('vchat_session_id', sessionId);
   }
   return sessionId;
 };
