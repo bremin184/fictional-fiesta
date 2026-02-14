@@ -17,6 +17,8 @@ export interface ChatMessage {
   type: 'text' | 'system';
 }
 
+export type GameLayoutSize = 'small' | 'medium' | 'large';
+
 export interface Game {
   id: string;
   name: string;
@@ -25,6 +27,7 @@ export interface Game {
   category: 'strategy' | 'trivia' | 'party' | 'casual';
   supportsAI: boolean;
   players: '1v1' | 'multiplayer';
+  layoutSize: GameLayoutSize;
 }
 
 export type MatchMode = 'dynamic' | 'opposite';

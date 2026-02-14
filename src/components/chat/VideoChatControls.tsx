@@ -39,7 +39,7 @@ export const VideoChatControls: React.FC<VideoChatControlsProps> = ({
     onEndCall,
 }) => {
     return (
-        <div className="sticky bottom-0 left-0 right-0 z-40 flex justify-center py-4 lg:py-6 bg-background/50 backdrop-blur-sm border-t border-border/50">
+        <div className="sticky bottom-0 left-0 right-0 z-[var(--z-controls)] flex justify-center py-4 lg:py-6 bg-background/50 backdrop-blur-sm border-t border-border/50">
             <GlassPanel className="px-6 py-4 flex items-center gap-4">
                 <button
                     onClick={onToggleMute}

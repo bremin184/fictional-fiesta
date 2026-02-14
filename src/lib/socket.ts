@@ -1,8 +1,18 @@
 import { io, Socket } from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
 
-// Use Vite environment variable or default to local backend port
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+// Dynamically resolve the signaling server URL.
+// If the page is loaded via a LAN IP (e.g. 192.168.45.111:8080),
+// the socket connects to the same host on port 3001.
+// Respects the page protocol (HTTP/HTTPS).
+const getSocketUrl = (): string => {
+  if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+  if (typeof window === 'undefined') return 'http://localhost:3001';
+  const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+  const host = window.location.hostname;
+  return `${protocol}://${host}:3001`;
+};
+const SOCKET_URL = getSocketUrl();
 
 let socket: Socket | null = null;
 

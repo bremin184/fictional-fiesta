@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Zap } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
+import { FloatingPanel } from '@/components/ui/FloatingPanel';
 import { useApp } from '@/context/AppContext';
 import { games } from '@/data/games';
 import { DeviceCheck } from '@/components/ui/DeviceCheck';
 import { SearchingOverlay } from '@/components/ui/SearchingOverlay';
 import { VideoCall } from '@/components/ui/VideoCall';
 import { useMatchFinding } from '@/hooks/useMatchFinding';
+import { useLayoutEngine } from '@/hooks/useLayoutEngine';
 import { getSocket } from '@/lib/socket';
 import { ChatSidebar, ChatMessage } from '@/components/chat/ChatSidebar';
 import { GamesSidebar } from '@/components/chat/GamesSidebar';
@@ -33,6 +35,13 @@ const VideoChat: React.FC = () => {
   const [pendingInvite, setPendingInvite] = useState<{ gameId: string; gameName: string } | null>(null);
   const [waitingForResponse, setWaitingForResponse] = useState<string | null>(null);
   const [isGameInviter, setIsGameInviter] = useState(false);
+
+  // Smart layout engine
+  const { layoutMode, gridTemplate, videoCompact, isMobile } = useLayoutEngine({
+    activeGameId,
+    showChat,
+    showGames,
+  });
 
   // Refs for cleanup in useEffect
   const matchRef = useRef(match);
@@ -112,8 +121,24 @@ const VideoChat: React.FC = () => {
       setLocalStream(stream);
       setDevicesSelected(true);
       findMatch();
-    } catch (err) {
-      console.error('Failed to access camera:', err);
+    } catch (err: any) {
+      console.error('[VideoChat] getUserMedia failed:', {
+        name: err?.name,
+        message: err?.message,
+        isSecureContext: window.isSecureContext,
+        protocol: window.location.protocol,
+        hostname: window.location.hostname,
+      });
+
+      if (err?.name === 'NotAllowedError' && !window.isSecureContext) {
+        addSystemMessage('⚠️ Camera blocked: HTTPS required for LAN access. See DeviceCheck for instructions.');
+      } else if (err?.name === 'NotAllowedError') {
+        addSystemMessage('⚠️ Camera permission denied. Please allow access in browser settings.');
+      } else if (err?.name === 'NotFoundError') {
+        addSystemMessage('⚠️ No camera or microphone found.');
+      } else {
+        addSystemMessage(`⚠️ Camera error: ${err?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -232,17 +257,50 @@ const VideoChat: React.FC = () => {
     setIsVideoOff(!isVideoOff);
   };
 
+  // Close games sidebar when a game activates
+  const handleGameSelect = (gameId: string) => {
+    setShowGames(false);
+    if (connectedUser && match) {
+      // Multiplayer: send invite to peer
+      const game = getGameById(gameId);
+      const socket = getSocket();
+      if (socket && game) {
+        socket.emit('game:invite', {
+          roomId: match.roomId,
+          gameId,
+          gameName: game.name,
+        });
+        setWaitingForResponse(gameId);
+        addSystemMessage(`Sent game invite: ${game.name}. Waiting for response...`);
+      }
+    } else {
+      // AI mode: open directly
+      setActiveGameId(gameId);
+    }
+  };
+
+  // Determine grid classes based on layout engine
+  const getGridClasses = () => {
+    const base = 'h-screen bg-background flex flex-col lg:grid lg:gap-4 lg:p-4 overflow-hidden transition-all duration-300 ease-out';
+
+    if (layoutMode === 'split') {
+      // Game gets its own column in split mode
+      if (showChat) return `${base} lg:grid-cols-[1fr_minmax(320px,40%)_20rem]`;
+      return `${base} lg:grid-cols-[1fr_minmax(320px,40%)]`;
+    }
+
+    // For float, dominant, and no-game modes
+    if (showGames) return `${base} lg:grid-cols-[1fr_20rem]`;
+    if (showChat) return `${base} lg:grid-cols-[1fr_20rem]`;
+    return `${base} lg:grid-cols-[1fr]`;
+  };
+
   return (
-    <div
-      className={`h-screen bg-background flex flex-col lg:grid lg:gap-4 lg:p-4 overflow-hidden transition-all duration-300 ease-out ${showGames
-        ? 'lg:grid-cols-[30%_1fr_20rem]'
-        : 'lg:grid-cols-[1fr_20rem]'
-        }`}
-    >
+    <div className={getGridClasses()}>
       {/* Main Video Area */}
       <div className="flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <div className="sticky top-0 left-0 right-0 z-40 px-4 py-3 lg:px-6 lg:py-4 bg-background/50 backdrop-blur-sm border-b border-border/50 flex items-center justify-between">
+        <div className="sticky top-0 left-0 right-0 z-[var(--z-controls)] px-4 py-3 lg:px-6 lg:py-4 bg-background/50 backdrop-blur-sm border-b border-border/50 flex items-center justify-between">
           <button
             onClick={() => navigate('/lobby')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background/50 backdrop-blur-sm text-sm hover:bg-background/70 transition-colors"
@@ -283,17 +341,20 @@ const VideoChat: React.FC = () => {
               localStream={localStream}
               onEndCall={handleEndCall}
               onPeerDisconnect={handlePeerDisconnect}
+              compact={videoCompact}
             />
           )}
 
-          {/* Game Overlay - renders on top of video, keeps connection alive */}
-          {activeGameId && (
+          {/* Game Overlay — FLOAT mode renders as floating panel (portal-like, above this container) */}
+          {/* DOMINANT mode renders as absolute overlay here */}
+          {activeGameId && layoutMode === 'dominant' && (
             <GameOverlay
               gameId={activeGameId}
               isAI={!match}
               roomId={match?.roomId || null}
               isInitiator={isGameInviter}
               onClose={() => { setActiveGameId(null); setIsGameInviter(false); }}
+              layoutMode={layoutMode}
             />
           )}
 
@@ -331,7 +392,7 @@ const VideoChat: React.FC = () => {
 
           {/* Waiting for invite response toast */}
           {waitingForResponse && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60]">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-popup)]">
               <GlassPanel className="px-6 py-3 flex items-center gap-3">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm font-medium">Waiting for response...</span>
@@ -346,7 +407,7 @@ const VideoChat: React.FC = () => {
           )}
         </div>
 
-        {/* Control Bar */}
+        {/* Control Bar — always accessible, z above game panels */}
         {match && (
           <VideoChatControls
             isMuted={isMuted}
@@ -364,6 +425,30 @@ const VideoChat: React.FC = () => {
         )}
       </div>
 
+      {/* SPLIT MODE: Game as a grid column alongside video */}
+      {activeGameId && layoutMode === 'split' && (
+        <GameOverlay
+          gameId={activeGameId}
+          isAI={!match}
+          roomId={match?.roomId || null}
+          isInitiator={isGameInviter}
+          onClose={() => { setActiveGameId(null); setIsGameInviter(false); }}
+          layoutMode={layoutMode}
+        />
+      )}
+
+      {/* FLOAT MODE: Game as a draggable floating panel (rendered outside grid flow) */}
+      {activeGameId && layoutMode === 'float' && (
+        <GameOverlay
+          gameId={activeGameId}
+          isAI={!match}
+          roomId={match?.roomId || null}
+          isInitiator={isGameInviter}
+          onClose={() => { setActiveGameId(null); setIsGameInviter(false); }}
+          layoutMode={layoutMode}
+        />
+      )}
+
       {/* Chat Sidebar */}
       {showChat && (
         <ChatSidebar
@@ -378,26 +463,7 @@ const VideoChat: React.FC = () => {
         <GamesSidebar
           games={games}
           connectedUser={!!connectedUser}
-          onSelectGame={(gameId) => {
-            setShowGames(false);
-            if (connectedUser && match) {
-              // Multiplayer: send invite to peer
-              const game = getGameById(gameId);
-              const socket = getSocket();
-              if (socket && game) {
-                socket.emit('game:invite', {
-                  roomId: match.roomId,
-                  gameId,
-                  gameName: game.name,
-                });
-                setWaitingForResponse(gameId);
-                addSystemMessage(`Sent game invite: ${game.name}. Waiting for response...`);
-              }
-            } else {
-              // AI mode: open directly
-              setActiveGameId(gameId);
-            }
-          }}
+          onSelectGame={handleGameSelect}
           onClose={() => setShowGames(false)}
         />
       )}

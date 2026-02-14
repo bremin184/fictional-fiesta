@@ -57,6 +57,14 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 10% 20%;
     --sidebar-ring: 280 85% 55%;
+
+    /* Structured Z-Index Scale */
+    --z-video: 10;
+    --z-game-panel: 20;
+    --z-controls: 30;
+    --z-floating-panel: 40;
+    --z-popup: 50;
+    --z-modal: 60;
   }
 
   * {

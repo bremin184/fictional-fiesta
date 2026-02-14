@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { MatchResult } from '@/hooks/useMatchFinding';
-import { Card } from '@/components/ui/card';
+import { FloatingPanel } from '@/components/ui/FloatingPanel';
 import { cn } from '@/lib/utils';
 
 interface VideoCallProps {
@@ -9,52 +9,116 @@ interface VideoCallProps {
   localStream: MediaStream | null;
   onEndCall?: () => void;
   onPeerDisconnect?: () => void;
+  /** When true, the entire video call renders as a small floating PiP */
+  compact?: boolean;
 }
 
-export const VideoCall: React.FC<VideoCallProps> = ({ match, localStream, onEndCall, onPeerDisconnect }) => {
+export const VideoCall: React.FC<VideoCallProps> = ({ match, localStream, onEndCall, onPeerDisconnect, compact = false }) => {
   const { remoteStream } = useWebRTC(match.roomId, localStream, match.isInitiator, onPeerDisconnect);
-  
+
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
+  // Re-bind srcObject whenever streams change OR compact toggles (DOM recreation)
+  // Also use a no-dep effect as safety net for any DOM recreation we can't predict
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream]);
+  }, [localStream, compact]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream]);
+  }, [remoteStream, compact]);
 
+  // Safety net: re-bind on every render in case refs change unexpectedly
+  useEffect(() => {
+    if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+    if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  });
+
+  // ─── COMPACT / PiP MODE ───
+  if (compact) {
+    return (
+      <FloatingPanel
+        title="📹 Video"
+        defaultCorner="bottom-left"
+        defaultWidth={280}
+        defaultHeight={220}
+        minWidth={200}
+        minHeight={160}
+        resizable={true}
+        zIndex={35}
+        className="shadow-lg"
+      >
+        <div className="relative w-full h-full bg-black overflow-hidden">
+          {/* Remote video fills the PiP */}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+
+          {!remoteStream && (
+            <div className="absolute inset-0 flex items-center justify-center text-white/50">
+              <p className="text-xs">Connecting...</p>
+            </div>
+          )}
+
+          {/* Local video inset — larger than before for visibility */}
+          <div className="absolute bottom-2 right-2 w-20 h-[60px] overflow-hidden rounded-lg border border-white/30 bg-black/60 shadow-md">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover transform scale-x-[-1]"
+            />
+          </div>
+        </div>
+      </FloatingPanel>
+    );
+  }
+
+  // ─── FULL SIZE MODE ───
   return (
-    <div className="relative w-full h-full min-h-[400px] bg-black rounded-xl overflow-hidden">
-      {/* Remote Video (Full Size) */}
+    <div className="absolute inset-0 bg-black overflow-hidden">
+      {/* Remote Video — fills entire container */}
       <video
         ref={remoteVideoRef}
         autoPlay
         playsInline
-        className="w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover"
       />
-      
+
       {!remoteStream && (
         <div className="absolute inset-0 flex items-center justify-center text-white/50">
           <p>Connecting to peer...</p>
         </div>
       )}
 
-      {/* Local Video (Picture in Picture) */}
-      <Card className={cn("absolute bottom-4 right-4 w-32 h-48 overflow-hidden border-2 border-white/20 shadow-lg bg-black/50 backdrop-blur-sm")}>
+      {/* Local Video PiP — properly sized and positioned */}
+      <div className={cn(
+        "absolute bottom-6 right-6 overflow-hidden rounded-xl",
+        "border-2 border-white/20 shadow-xl bg-black/50 backdrop-blur-sm",
+        "w-40 h-[120px]",  // 160x120 — comfortable 4:3 PiP
+        "sm:w-48 sm:h-36", // 192x144 on larger screens
+      )}>
         <video
           ref={localVideoRef}
           autoPlay
           playsInline
           muted
-          className="w-full h-full object-cover transform scale-x-[-1]" // Mirror effect
+          className="w-full h-full object-cover transform scale-x-[-1]"
         />
-      </Card>
+      </div>
     </div>
   );
 };

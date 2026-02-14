@@ -16,7 +16,7 @@ app.get('/health', (req, res) => {
 
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:8080',
+        origin: process.env.CLIENT_URL || '*',
         methods: ['GET', 'POST']
     }
 });
@@ -25,6 +25,25 @@ socketHandler(io);
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`\n❌ Port ${PORT} is already in use.`);
+        console.error(`   Kill the existing process: npx kill-port ${PORT}`);
+        console.error(`   Or use a different port: PORT=3002 npm run dev:server\n`);
+        process.exit(1);
+    }
+    throw err;
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    const lanIPs = Object.values(nets).flat()
+        .filter(n => n.family === 'IPv4' && !n.internal)
+        .map(n => n.address);
     console.log(`Visha signaling server running on port ${PORT}`);
+    console.log(`Local:   http://localhost:${PORT}`);
+    if (lanIPs.length > 0) {
+        console.log(`Network: ${lanIPs.map(ip => `http://${ip}:${PORT}`).join(', ')}`);
+    }
 });

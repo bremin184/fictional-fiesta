@@ -9,6 +9,7 @@ export const games: Game[] = [
     category: 'casual',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'small',
   },
   {
     id: 'chess',
@@ -18,6 +19,7 @@ export const games: Game[] = [
     category: 'strategy',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'large',
   },
   {
     id: 'connect-four',
@@ -27,6 +29,7 @@ export const games: Game[] = [
     category: 'strategy',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'medium',
   },
   {
     id: 'trivia',
@@ -36,6 +39,7 @@ export const games: Game[] = [
     category: 'trivia',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'medium',
   },
   {
     id: 'truth-or-dare',
@@ -45,6 +49,7 @@ export const games: Game[] = [
     category: 'party',
     supportsAI: false,
     players: '1v1',
+    layoutSize: 'small',
   },
   {
     id: 'would-you-rather',
@@ -54,6 +59,7 @@ export const games: Game[] = [
     category: 'party',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'medium',
   },
   {
     id: 'hangman',
@@ -63,6 +69,7 @@ export const games: Game[] = [
     category: 'casual',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'medium',
   },
   {
     id: 'rock-paper-scissors',
@@ -72,6 +79,7 @@ export const games: Game[] = [
     category: 'casual',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'small',
   },
   {
     id: 'twenty-questions',
@@ -81,6 +89,7 @@ export const games: Game[] = [
     category: 'party',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'small',
   },
   {
     id: 'word-chain',
@@ -90,6 +99,7 @@ export const games: Game[] = [
     category: 'casual',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'medium',
   },
   {
     id: 'battleship',
@@ -99,6 +109,7 @@ export const games: Game[] = [
     category: 'strategy',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'large',
   },
   {
     id: 'checkers',
@@ -108,6 +119,7 @@ export const games: Game[] = [
     category: 'strategy',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'large',
   },
   {
     id: 'memory-match',
@@ -117,6 +129,7 @@ export const games: Game[] = [
     category: 'casual',
     supportsAI: true,
     players: '1v1',
+    layoutSize: 'small',
   },
   {
     id: 'drawing-guess',
@@ -126,6 +139,7 @@ export const games: Game[] = [
     category: 'party',
     supportsAI: false,
     players: 'multiplayer',
+    layoutSize: 'large',
   },
 ];
 
