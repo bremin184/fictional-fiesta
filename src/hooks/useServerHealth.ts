@@ -21,7 +21,8 @@ export function useServerHealth(serverBaseUrl?: string): UseServerHealthResult {
     const getBaseUrl = (): string => {
         if (serverBaseUrl) return serverBaseUrl;
         const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-        return `http://${host}:3001`;
+        const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https' : 'http';
+        return `${protocol}://${host}:3001`;
     };
 
     const checkHealth = useCallback(async (): Promise<boolean> => {
