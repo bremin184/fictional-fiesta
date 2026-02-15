@@ -158,7 +158,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ gameId, isAI, roomId, 
             >
                 <div className="flex flex-col h-full">
                     {/* Game Area */}
-                    <div className="flex-1 overflow-auto p-3 flex items-center justify-center">
+                    <div className="flex-1 overflow-hidden p-3 flex items-center justify-center">
                         {renderGame()}
                     </div>
                     {/* Compact controls */}
@@ -181,7 +181,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ gameId, isAI, roomId, 
         return (
             <div className="flex flex-col h-full overflow-hidden bg-card/50 backdrop-blur-sm border-l border-border/30 animate-in slide-in-from-right duration-300">
                 {renderHeader()}
-                <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                <div className="flex-1 overflow-hidden p-4 flex items-center justify-center">
                     {renderGame()}
                 </div>
                 {renderControls()}
@@ -191,13 +191,15 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ gameId, isAI, roomId, 
 
     // ─── GAME-DUAL MODE: Game as center column in three-column grid ───
     if (layoutMode === 'game-dual') {
+        // Chess manages its own full chrome — no GameOverlay header/controls
+        const isChess = gameId === 'chess';
         return (
             <div className="flex flex-col h-full overflow-hidden bg-card/50 backdrop-blur-sm border-x border-border/30 animate-in fade-in duration-200">
-                {renderHeader()}
-                <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                {!isChess && renderHeader()}
+                <div className={`flex-1 overflow-hidden flex items-center justify-center ${isChess ? '' : 'p-4'}`}>
                     {renderGame()}
                 </div>
-                {renderControls()}
+                {!isChess && renderControls()}
             </div>
         );
     }
@@ -207,7 +209,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ gameId, isAI, roomId, 
     return (
         <div className="absolute inset-0 z-[var(--z-game-panel)] bg-background/95 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
             {renderHeader()}
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+            <div className="flex-1 overflow-hidden p-4 flex items-center justify-center">
                 {renderGame()}
             </div>
             {renderControls()}

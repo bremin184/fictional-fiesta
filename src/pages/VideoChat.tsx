@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Zap } from 'lucide-react';
+import {
+  ChevronLeft, Zap, Video, VideoOff, Mic, MicOff,
+  PhoneOff, MessageSquare, Gamepad2, SkipForward,
+} from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { FloatingPanel } from '@/components/ui/FloatingPanel';
 import { useApp } from '@/context/AppContext';
@@ -295,15 +298,17 @@ const VideoChat: React.FC = () => {
 
   // Determine grid classes based on layout engine
   const getGridClasses = () => {
-    const base = 'h-screen bg-background flex flex-col lg:grid lg:gap-4 lg:p-4 overflow-hidden transition-all duration-300 ease-out';
+    // Use tighter padding in game-dual mode to maximize board space; original padding otherwise
+    const isGameDual = layoutMode === 'game-dual' && activeGameId;
+    const base = isGameDual
+      ? 'h-screen bg-background flex flex-col lg:grid lg:gap-2 lg:p-2 overflow-hidden transition-all duration-300 ease-out'
+      : 'h-screen bg-background flex flex-col lg:grid lg:gap-4 lg:p-4 overflow-hidden transition-all duration-300 ease-out';
 
     if (layoutMode === 'split') {
-      // Game gets its own column in split mode
       if (showChat) return `${base} lg:grid-cols-[1fr_minmax(320px,40%)_20rem]`;
       return `${base} lg:grid-cols-[1fr_minmax(320px,40%)]`;
     }
 
-    // For float, dominant, and no-game modes
     if (showGames) return `${base} lg:grid-cols-[1fr_20rem]`;
     if (showChat) return `${base} lg:grid-cols-[1fr_20rem]`;
     return `${base} lg:grid-cols-[1fr]`;
@@ -313,29 +318,80 @@ const VideoChat: React.FC = () => {
     <div className={getGridClasses()}>
       {/* Main Video Area */}
       <div className="flex flex-col overflow-hidden">
-        {/* Top Bar */}
-        <div className="sticky top-0 left-0 right-0 z-[var(--z-controls)] px-4 py-3 lg:px-6 lg:py-4 bg-background/50 backdrop-blur-sm border-b border-border/50 flex items-center justify-between">
-          <button
-            onClick={() => navigate('/lobby')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background/50 backdrop-blur-sm text-sm hover:bg-background/70 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Back
-          </button>
+        {/* Top Bar — conditionally compact in game-dual mode */}
+        {(layoutMode === 'game-dual' && activeGameId) ? (
+          /* Compact top bar with inline call controls for game-dual mode */
+          <div className="sticky top-0 left-0 right-0 z-[var(--z-controls)] px-3 py-1.5 bg-background/80 backdrop-blur-sm border-b border-border/50 flex items-center justify-between gap-2">
+            <button
+              onClick={() => navigate('/lobby')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background/50 text-xs hover:bg-background/70 transition-colors shrink-0"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Back
+            </button>
 
-          {connectedUser && (
-            <GlassPanel className="px-4 py-2 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
-              <span className="text-sm font-medium">{connectedUser.name}</span>
-            </GlassPanel>
-          )}
+            {connectedUser && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted/50 shrink-0">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-xs font-medium">{connectedUser.name}</span>
+              </div>
+            )}
 
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-neon rounded-xl flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
+            {/* Inline call controls */}
+            {match && (
+              <div className="flex items-center gap-1.5">
+                <button onClick={toggleMute} className={`p-2 rounded-lg transition-colors ${isMuted ? 'bg-primary/30 text-primary' : 'hover:bg-muted'}`} title={isMuted ? 'Unmute' : 'Mute'}>
+                  {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+                <button onClick={toggleVideo} className={`p-2 rounded-lg transition-colors ${isVideoOff ? 'bg-primary/30 text-primary' : 'hover:bg-muted'}`} title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}>
+                  {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                </button>
+                <button onClick={() => setShowChat(!showChat)} className={`p-2 rounded-lg transition-colors ${showChat ? 'bg-primary/30 text-primary' : 'hover:bg-muted'}`} title="Chat">
+                  <MessageSquare className="w-4 h-4" />
+                </button>
+                <button onClick={() => setShowGames(!showGames)} className={`p-2 rounded-lg transition-colors ${showGames ? 'bg-primary/30 text-primary' : 'hover:bg-muted'}`} title="Games">
+                  <Gamepad2 className="w-4 h-4" />
+                </button>
+                {!!connectedUser && (
+                  <button onClick={handleSkip} className="p-2 rounded-lg hover:bg-muted transition-colors" title="Skip">
+                    <SkipForward className="w-4 h-4" />
+                  </button>
+                )}
+                <button onClick={handleEndCall} className="p-2 rounded-lg bg-destructive/80 hover:bg-destructive text-white transition-colors" title="End call">
+                  <PhoneOff className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="w-8 h-8 bg-gradient-neon rounded-lg flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-white" />
             </div>
           </div>
-        </div>
+        ) : (
+          /* Original full-size top bar for normal video call */
+          <div className="sticky top-0 left-0 right-0 z-[var(--z-controls)] px-4 py-3 lg:px-6 lg:py-4 bg-background/50 backdrop-blur-sm border-b border-border/50 flex items-center justify-between">
+            <button
+              onClick={() => navigate('/lobby')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background/50 backdrop-blur-sm text-sm hover:bg-background/70 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+
+            {connectedUser && (
+              <GlassPanel className="px-4 py-2 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
+                <span className="text-sm font-medium">{connectedUser.name}</span>
+              </GlassPanel>
+            )}
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-neon rounded-xl flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Remote Video / Searching State */}
         <div className="flex-1 relative bg-gradient-to-br from-muted to-card flex items-center justify-center overflow-hidden">
@@ -364,7 +420,7 @@ const VideoChat: React.FC = () => {
 
           {/* GAME-DUAL MODE: Three-column layout [stranger | game | local] */}
           {match && layoutMode === 'game-dual' && activeGameId && (
-            <div className="absolute inset-0 grid grid-cols-[minmax(160px,1fr)_2fr_minmax(160px,1fr)] gap-2 p-2">
+            <div className="absolute inset-0 grid grid-cols-[minmax(120px,1fr)_2fr_minmax(120px,1fr)] gap-1 p-1">
               {/* LEFT — Stranger video */}
               <RemoteVideo stream={remoteStream} className="border border-border/30" />
               {/* CENTER — Game */}
@@ -442,8 +498,8 @@ const VideoChat: React.FC = () => {
           )}
         </div>
 
-        {/* Control Bar — always accessible, z above game panels */}
-        {match && (
+        {/* Bottom call bar — shown in normal video mode, hidden in game-dual */}
+        {match && !(layoutMode === 'game-dual' && activeGameId) && (
           <VideoChatControls
             isMuted={isMuted}
             isVideoOff={isVideoOff}

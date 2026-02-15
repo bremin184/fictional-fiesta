@@ -16,7 +16,6 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 }) => {
     const chess = useMemo(() => new Chess(gameState.fen), [gameState.fen]);
 
-    // Board is flipped for black
     const rows = useMemo(() => {
         const r = Array.from({ length: 8 }, (_, i) => i);
         return myColor === 'b' ? r : r;
@@ -27,7 +26,6 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         return myColor === 'b' ? c.reverse() : c;
     }, [myColor]);
 
-    // Find the king square if in check
     const checkSquare = useMemo(() => {
         if (!gameState.isCheck) return null;
         const turn = gameState.turn;
@@ -46,8 +44,25 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     const renderRows = myColor === 'b' ? [...rows].reverse() : rows;
 
     return (
-        <div className="w-full max-w-[min(100%,60vh)] aspect-square mx-auto">
-            <div className="grid grid-cols-8 grid-rows-8 w-full h-full rounded-lg overflow-hidden shadow-xl border-2 border-amber-900/50">
+        <div className="h-full w-full flex items-center justify-center">
+            {/*
+                Height-first sizing strategy:
+                - height: 100%  → fills parent (the flex-1 min-h-0 wrapper)
+                - aspect-ratio: 1/1  → width = height automatically
+                - max-width: 100%  → prevents horizontal overflow
+                This ensures the board is as large as the available HEIGHT allows,
+                and the width follows from the 1:1 aspect ratio.
+            */}
+            <div
+                className="grid grid-cols-8 grid-rows-8 overflow-hidden"
+                style={{
+                    height: '100%',
+                    aspectRatio: '1 / 1',
+                    maxWidth: '100%',
+                    borderRadius: '3px',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.5), 0 0 0 2px #8b6914',
+                }}
+            >
                 {renderRows.map(row =>
                     cols.map(col => {
                         const square = (String.fromCharCode(97 + col) + (8 - row)) as Square;

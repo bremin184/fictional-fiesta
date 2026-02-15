@@ -1,7 +1,6 @@
 import React from 'react';
 import { Square } from 'chess.js';
 import { ChessPiece } from './ChessPiece';
-import { cn } from '@/lib/utils';
 
 interface ChessSquareProps {
     square: Square;
@@ -20,28 +19,45 @@ export const ChessSquare: React.FC<ChessSquareProps> = ({
 }) => {
     const isLight = (row + col) % 2 === 0;
 
+    // Chess.com wood-grain palette
+    const baseColor = isLight ? '#f0d9b5' : '#b58863';
+    const selectedColor = isLight ? '#f7ec5a' : '#daa520';
+    const lastMoveColor = isLight ? '#f7f18d' : '#cda738';
+    const checkColor = '#e84040';
+
+    let bgColor = baseColor;
+    if (isSelected) bgColor = selectedColor;
+    else if (isLastMove) bgColor = lastMoveColor;
+
     return (
         <button
-            className={cn(
-                'relative aspect-square flex items-center justify-center transition-colors duration-150',
-                // Base colors
-                isLight ? 'bg-amber-100' : 'bg-amber-800',
-                // States
-                isSelected && 'ring-2 ring-inset ring-sky-400 bg-sky-300/60',
-                isLastMove && !isSelected && (isLight ? 'bg-yellow-200' : 'bg-yellow-700'),
-                isCheck && 'bg-red-500/70 ring-2 ring-inset ring-red-400',
-                // Hover
-                !isSelected && !isCheck && 'hover:brightness-110',
-            )}
+            className="relative flex items-center justify-center"
+            style={{
+                backgroundColor: bgColor,
+                boxShadow: isCheck ? `inset 0 0 12px 4px ${checkColor}` : undefined,
+            }}
             onClick={() => onClick(square)}
             aria-label={`${square}${piece ? ` ${piece.color === 'w' ? 'white' : 'black'} ${piece.type}` : ''}`}
         >
-            {/* Legal move indicator */}
+            {/* Legal move indicator — empty square */}
             {isLegalMove && !piece && (
-                <div className="absolute w-[30%] h-[30%] rounded-full bg-black/20" />
+                <div
+                    className="absolute rounded-full"
+                    style={{
+                        width: '28%',
+                        height: '28%',
+                        backgroundColor: 'rgba(0,0,0,0.18)',
+                    }}
+                />
             )}
+            {/* Legal move indicator — capture ring */}
             {isLegalMove && piece && (
-                <div className="absolute inset-0 rounded-sm ring-[3px] ring-inset ring-black/20" />
+                <div
+                    className="absolute inset-[3px] rounded-full"
+                    style={{
+                        border: '3px solid rgba(0,0,0,0.18)',
+                    }}
+                />
             )}
 
             {/* Piece */}
@@ -49,18 +65,18 @@ export const ChessSquare: React.FC<ChessSquareProps> = ({
 
             {/* Coordinate labels */}
             {col === 0 && (
-                <span className={cn(
-                    'absolute top-0.5 left-0.5 text-[0.55rem] font-bold leading-none',
-                    isLight ? 'text-amber-800/60' : 'text-amber-100/60',
-                )}>
+                <span
+                    className="absolute top-[2px] left-[3px] text-[0.55rem] font-bold leading-none select-none"
+                    style={{ color: isLight ? '#b58863' : '#f0d9b5', opacity: 0.8 }}
+                >
                     {8 - row}
                 </span>
             )}
             {row === 7 && (
-                <span className={cn(
-                    'absolute bottom-0.5 right-0.5 text-[0.55rem] font-bold leading-none',
-                    isLight ? 'text-amber-800/60' : 'text-amber-100/60',
-                )}>
+                <span
+                    className="absolute bottom-[2px] right-[3px] text-[0.55rem] font-bold leading-none select-none"
+                    style={{ color: isLight ? '#b58863' : '#f0d9b5', opacity: 0.8 }}
+                >
                     {String.fromCharCode(97 + col)}
                 </span>
             )}
