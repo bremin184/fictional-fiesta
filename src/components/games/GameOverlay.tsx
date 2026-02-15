@@ -15,6 +15,7 @@ import { MemoryMatch } from '@/components/games/MemoryMatch';
 import { TriviaGame } from '@/components/games/TriviaGame';
 import { WouldYouRather } from '@/components/games/WouldYouRather';
 import { WordChain } from '@/components/games/WordChain';
+import { ChessGame } from '@/components/games/chess/ChessGame';
 
 interface GameOverlayProps {
     gameId: string;
@@ -60,6 +61,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ gameId, isAI, roomId, 
             case 'trivia': return <TriviaGame {...props} />;
             case 'would-you-rather': return <WouldYouRather {...props} />;
             case 'word-chain': return <WordChain {...props} />;
+            case 'chess': return <ChessGame {...props} />;
             default: return (
                 <div className="text-center py-8">
                     <div className="text-5xl mb-3">{game.icon}</div>
@@ -187,8 +189,21 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ gameId, isAI, roomId, 
         );
     }
 
+    // ─── GAME-DUAL MODE: Game as center column in three-column grid ───
+    if (layoutMode === 'game-dual') {
+        return (
+            <div className="flex flex-col h-full overflow-hidden bg-card/50 backdrop-blur-sm border-x border-border/30 animate-in fade-in duration-200">
+                {renderHeader()}
+                <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                    {renderGame()}
+                </div>
+                {renderControls()}
+            </div>
+        );
+    }
+
     // ─── DOMINANT MODE: Game takes primary space, full overlay ───
-    // For large games and mobile medium/large games
+    // For mobile large games (three-column not feasible)
     return (
         <div className="absolute inset-0 z-[var(--z-game-panel)] bg-background/95 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
             {renderHeader()}

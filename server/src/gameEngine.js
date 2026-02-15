@@ -249,18 +249,62 @@ function rpsMakeMove(state, socketId, move) {
     return { state };
 }
 
+// ─── CHESS ENGINE (thin relay — chess.js validates on client) ────────────────
+
+function createChess(player1, player2) {
+    return {
+        gameId: 'chess',
+        // Starting FEN position
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        players: { w: player1, b: player2 },
+        currentTurn: 'w',
+        status: 'playing',
+        winner: null,
+        lastMove: null,
+        moveHistory: [],
+    };
+}
+
+function chessMakeMove(state, socketId, move) {
+    // Validate player
+    const playerColor = state.players.w === socketId ? 'w' :
+        state.players.b === socketId ? 'b' : null;
+    if (!playerColor) return { error: 'You are not in this game' };
+    if (playerColor !== state.currentTurn) return { error: 'Not your turn' };
+
+    // Client sends validated FEN — accept it
+    if (!move.fen) return { error: 'Missing FEN in move' };
+
+    state.fen = move.fen;
+    state.lastMove = { from: move.from, to: move.to };
+    state.moveHistory.push(`${move.from}-${move.to}`);
+    state.currentTurn = state.currentTurn === 'w' ? 'b' : 'w';
+
+    // Check for game end conditions (sent by client)
+    if (move.isCheckmate) {
+        state.status = 'won';
+        state.winner = playerColor; // The player who made the checkmate move wins
+    } else if (move.isDraw || move.isStalemate) {
+        state.status = 'draw';
+    }
+
+    return { state };
+}
+
 // ─── ENGINE FACADE ──────────────────────────────────────────────────────────
 
 const GAME_FACTORIES = {
     'tic-tac-toe': createTicTacToe,
     'connect-four': createConnectFour,
     'rock-paper-scissors': createRPS,
+    'chess': createChess,
 };
 
 const MOVE_HANDLERS = {
     'tic-tac-toe': tttMakeMove,
     'connect-four': c4MakeMove,
     'rock-paper-scissors': rpsMakeMove,
+    'chess': chessMakeMove,
 };
 
 function createGame(gameId, roomId, player1, player2) {
@@ -305,6 +349,9 @@ function resetGame(roomId) {
         newSession = factory(session.players.O, session.players.X);
     } else if (session.gameId === 'connect-four') {
         newSession = factory(session.players.yellow, session.players.red);
+    } else if (session.gameId === 'chess') {
+        // Swap colors
+        newSession = factory(session.players.b, session.players.w);
     } else {
         // RPS: same players
         newSession = factory(session.players.player1, session.players.player2);

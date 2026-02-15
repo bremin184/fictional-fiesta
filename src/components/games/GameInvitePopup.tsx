@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Gamepad2, Check, X } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 
@@ -17,20 +17,24 @@ export const GameInvitePopup: React.FC<GameInvitePopupProps> = ({
 }) => {
     const [timeLeft, setTimeLeft] = useState(15);
 
-    // Auto-decline after 15 seconds
+    // Stable ref so timer doesn't restart on parent re-renders
+    const onDeclineRef = useRef(onDecline);
+    onDeclineRef.current = onDecline;
+
+    // Auto-decline after 15 seconds — empty deps so timer runs exactly once
     useEffect(() => {
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
                     clearInterval(timer);
-                    onDecline();
+                    onDeclineRef.current();
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
         return () => clearInterval(timer);
-    }, [onDecline]);
+    }, []);
 
     return (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top duration-300">

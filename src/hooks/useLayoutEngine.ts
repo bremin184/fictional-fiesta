@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GameLayoutSize } from '@/types';
 import { getGameById } from '@/data/games';
 
-export type LayoutMode = 'none' | 'float' | 'split' | 'dominant';
+export type LayoutMode = 'none' | 'float' | 'split' | 'dominant' | 'game-dual';
 
 export interface LayoutState {
     /** Current layout mode based on game size + viewport */
@@ -88,14 +88,14 @@ export function useLayoutEngine({ activeGameId, showChat, showGames }: UseLayout
         if (isTablet) {
             if (gameSize === 'small') return 'float';
             if (gameSize === 'medium') return 'split';
-            return 'dominant';
+            return 'game-dual'; // Large games: three-column layout
         }
 
         // Desktop
         switch (gameSize) {
             case 'small': return 'float';
             case 'medium': return 'split';
-            case 'large': return 'dominant';
+            case 'large': return 'game-dual'; // Three-column: [video | game | video]
             default: return 'float';
         }
     }, [activeGameId, gameSize, isMobile, isTablet]);
@@ -116,6 +116,12 @@ export function useLayoutEngine({ activeGameId, showChat, showGames }: UseLayout
             return 'lg:grid-cols-[1fr_minmax(320px,40%)]';
         }
 
+        if (layoutMode === 'game-dual') {
+            // Three-column: [stranger video | game | local video]
+            if (showChat) return 'lg:grid-cols-[minmax(200px,1fr)_2fr_minmax(200px,1fr)_20rem]';
+            return 'lg:grid-cols-[minmax(200px,1fr)_2fr_minmax(200px,1fr)]';
+        }
+
         if (layoutMode === 'dominant') {
             // Game takes primary space, video shrinks to PiP (not in grid)
             if (showChat) return 'lg:grid-cols-[1fr_20rem]';
@@ -126,6 +132,7 @@ export function useLayoutEngine({ activeGameId, showChat, showGames }: UseLayout
     }, [layoutMode, showChat, showGames]);
 
     // Whether video should be in compact/PiP mode
+    // Video is compact only in dominant mode; game-dual keeps both videos full-size
     const videoCompact = layoutMode === 'dominant';
 
     return {

@@ -11,9 +11,13 @@ interface VideoCallProps {
   onPeerDisconnect?: () => void;
   /** When true, the entire video call renders as a small floating PiP */
   compact?: boolean;
+  /** Callback to pass remoteStream up to parent (for game-dual layout) */
+  onRemoteStream?: (stream: MediaStream | null) => void;
+  /** When true, VideoCall is hidden (WebRTC stays alive) — used in game-dual mode */
+  hidden?: boolean;
 }
 
-export const VideoCall: React.FC<VideoCallProps> = ({ match, localStream, onEndCall, onPeerDisconnect, compact = false }) => {
+export const VideoCall: React.FC<VideoCallProps> = ({ match, localStream, onEndCall, onPeerDisconnect, compact = false, onRemoteStream, hidden = false }) => {
   const { remoteStream } = useWebRTC(match.roomId, localStream, match.isInitiator, onPeerDisconnect);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -42,6 +46,14 @@ export const VideoCall: React.FC<VideoCallProps> = ({ match, localStream, onEndC
       remoteVideoRef.current.srcObject = remoteStream;
     }
   });
+
+  // Pass remoteStream up to parent when available (for game-dual layout)
+  useEffect(() => {
+    onRemoteStream?.(remoteStream);
+  }, [remoteStream, onRemoteStream]);
+
+  // When hidden, keep WebRTC alive but render nothing visible
+  if (hidden) return null;
 
   // ─── COMPACT / PiP MODE ───
   if (compact) {

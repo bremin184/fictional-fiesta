@@ -16,6 +16,8 @@ import { GamesSidebar } from '@/components/chat/GamesSidebar';
 import { VideoChatControls } from '@/components/chat/VideoChatControls';
 import { GameOverlay } from '@/components/games/GameOverlay';
 import { GameInvitePopup } from '@/components/games/GameInvitePopup';
+import { RemoteVideo } from '@/components/video/RemoteVideo';
+import { LocalVideo } from '@/components/video/LocalVideo';
 import { getGameById } from '@/data/games';
 
 const VideoChat: React.FC = () => {
@@ -35,6 +37,12 @@ const VideoChat: React.FC = () => {
   const [pendingInvite, setPendingInvite] = useState<{ gameId: string; gameName: string } | null>(null);
   const [waitingForResponse, setWaitingForResponse] = useState<string | null>(null);
   const [isGameInviter, setIsGameInviter] = useState(false);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
+  // Stable callback for VideoCall to pass remoteStream up
+  const handleRemoteStream = useCallback((stream: MediaStream | null) => {
+    setRemoteStream(stream);
+  }, []);
 
   // Smart layout engine
   const { layoutMode, gridTemplate, videoCompact, isMobile } = useLayoutEngine({
@@ -84,10 +92,12 @@ const VideoChat: React.FC = () => {
     if (!socket) return;
 
     const handleGameInvite = ({ gameId, gameName }: { gameId: string; gameName: string }) => {
+      console.log('[Game] 📩 Received invite:', { gameId, gameName });
       setPendingInvite({ gameId, gameName });
     };
 
     const handleInviteResponse = ({ gameId, accepted }: { gameId: string; accepted: boolean }) => {
+      console.log('[Game] 📨 Invite response:', { gameId, accepted });
       setWaitingForResponse(null);
       if (accepted) {
         setIsGameInviter(true); // I sent the invite, I call game:start
@@ -259,22 +269,26 @@ const VideoChat: React.FC = () => {
 
   // Close games sidebar when a game activates
   const handleGameSelect = (gameId: string) => {
+    console.log('[Game] 🎮 Selected:', gameId, { hasMatch: !!match, hasConnectedUser: !!connectedUser });
     setShowGames(false);
     if (connectedUser && match) {
       // Multiplayer: send invite to peer
       const game = getGameById(gameId);
       const socket = getSocket();
       if (socket && game) {
+        console.log('[Game] 📤 Emitting game:invite to room:', match.roomId);
         socket.emit('game:invite', {
           roomId: match.roomId,
           gameId,
           gameName: game.name,
         });
+        setIsGameInviter(true); // I'm the inviter — I'll call game:start when accepted
         setWaitingForResponse(gameId);
         addSystemMessage(`Sent game invite: ${game.name}. Waiting for response...`);
       }
     } else {
       // AI mode: open directly
+      console.log('[Game] 🤖 Opening in AI mode');
       setActiveGameId(gameId);
     }
   };
@@ -324,7 +338,7 @@ const VideoChat: React.FC = () => {
         </div>
 
         {/* Remote Video / Searching State */}
-        <div className="flex-1 relative bg-gradient-to-br from-muted to-card flex items-center justify-center">
+        <div className="flex-1 relative bg-gradient-to-br from-muted to-card flex items-center justify-center overflow-hidden">
           {!devicesSelected && (
             <DeviceCheck
               onDevicesReady={handleDevicesReady}
@@ -335,26 +349,47 @@ const VideoChat: React.FC = () => {
 
           {isSearching && <SearchingOverlay onCancel={cancelSearch} />}
 
+          {/* STABLE VideoCall — always at same tree position to prevent WebRTC remount */}
           {match && (
             <VideoCall
               match={match}
               localStream={localStream}
               onEndCall={handleEndCall}
               onPeerDisconnect={handlePeerDisconnect}
+              onRemoteStream={handleRemoteStream}
               compact={videoCompact}
+              hidden={layoutMode === 'game-dual' && !!activeGameId}
             />
           )}
 
-          {/* Game Overlay — FLOAT mode renders as floating panel (portal-like, above this container) */}
-          {/* DOMINANT mode renders as absolute overlay here */}
-          {activeGameId && layoutMode === 'dominant' && (
+          {/* GAME-DUAL MODE: Three-column layout [stranger | game | local] */}
+          {match && layoutMode === 'game-dual' && activeGameId && (
+            <div className="absolute inset-0 grid grid-cols-[minmax(160px,1fr)_2fr_minmax(160px,1fr)] gap-2 p-2">
+              {/* LEFT — Stranger video */}
+              <RemoteVideo stream={remoteStream} className="border border-border/30" />
+              {/* CENTER — Game */}
+              <GameOverlay
+                gameId={activeGameId}
+                isAI={!match}
+                roomId={match?.roomId || null}
+                isInitiator={isGameInviter}
+                onClose={() => { setActiveGameId(null); setIsGameInviter(false); }}
+                layoutMode={layoutMode}
+              />
+              {/* RIGHT — Local video */}
+              <LocalVideo stream={localStream} className="border border-border/30" />
+            </div>
+          )}
+
+          {/* Game Overlay — DOMINANT mode or AI fallback for game-dual */}
+          {activeGameId && (layoutMode === 'dominant' || (layoutMode === 'game-dual' && !match)) && (
             <GameOverlay
               gameId={activeGameId}
               isAI={!match}
               roomId={match?.roomId || null}
               isInitiator={isGameInviter}
               onClose={() => { setActiveGameId(null); setIsGameInviter(false); }}
-              layoutMode={layoutMode}
+              layoutMode="dominant"
             />
           )}
 

@@ -147,6 +147,9 @@ module.exports = (io) => {
 
         // User A invites User B to play a game
         socket.on('game:invite', ({ roomId, gameId, gameName }) => {
+            console.log(`[Game] 📩 Invite: ${socket.id} → room ${roomId} (${gameName})`);
+            const roomSockets = io.sockets.adapter.rooms.get(roomId);
+            console.log(`[Game]    Room members: ${roomSockets ? Array.from(roomSockets).join(', ') : 'NONE'}`);
             socket.to(roomId).emit('game:invite', {
                 gameId,
                 gameName,
@@ -156,6 +159,7 @@ module.exports = (io) => {
 
         // User B responds to the invite (accepted or declined)
         socket.on('game:invite-response', ({ roomId, gameId, accepted }) => {
+            console.log(`[Game] 📨 Response: ${socket.id} → room ${roomId} (accepted: ${accepted})`);
             socket.to(roomId).emit('game:invite-response', {
                 gameId,
                 accepted,
@@ -198,6 +202,13 @@ module.exports = (io) => {
             } else if (gameId === 'rock-paper-scissors') {
                 io.to(players[0]).emit('game:started', { gameId, state: { status: 'choosing' }, playerId: players[0] });
                 io.to(players[1]).emit('game:started', { gameId, state: { status: 'choosing' }, playerId: players[1] });
+            } else if (gameId === 'chess') {
+                io.to(players[0]).emit('game:started', {
+                    gameId, state: session, yourColor: 'w', currentTurn: 'w'
+                });
+                io.to(players[1]).emit('game:started', {
+                    gameId, state: session, yourColor: 'b', currentTurn: 'w'
+                });
             }
 
             console.log(`Game started: ${gameId} in room ${roomId}`);
@@ -227,8 +238,17 @@ module.exports = (io) => {
                         status: 'reveal'
                     });
                 }
+            } else if (session.gameId === 'chess') {
+                // Chess: broadcast FEN and lastMove
+                io.to(roomId).emit('game:state', {
+                    fen: session.fen,
+                    lastMove: session.lastMove,
+                    currentTurn: session.currentTurn,
+                    status: session.status,
+                    winner: session.winner
+                });
             } else {
-                // Board games: broadcast new state to the room
+                // Other board games: broadcast new state to the room
                 io.to(roomId).emit('game:state', {
                     board: session.board,
                     currentTurn: session.currentTurn,
@@ -278,6 +298,15 @@ module.exports = (io) => {
                 const p2 = newSession.players.player2;
                 io.to(p1).emit('game:started', { gameId: newSession.gameId, state: { status: 'choosing' }, playerId: p1 });
                 io.to(p2).emit('game:started', { gameId: newSession.gameId, state: { status: 'choosing' }, playerId: p2 });
+            } else if (newSession.gameId === 'chess') {
+                const wPlayer = newSession.players.w;
+                const bPlayer = newSession.players.b;
+                io.to(wPlayer).emit('game:started', {
+                    gameId: newSession.gameId, state: newSession, yourColor: 'w', currentTurn: 'w'
+                });
+                io.to(bPlayer).emit('game:started', {
+                    gameId: newSession.gameId, state: newSession, yourColor: 'b', currentTurn: 'w'
+                });
             }
 
             console.log(`Game reset in room ${roomId}`);
